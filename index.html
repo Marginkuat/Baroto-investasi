@@ -232,6 +232,14 @@ body{font-family:'Inter',sans-serif;background:#0D0F0A;color:#E8E2D5;min-height:
   </div>
 </div>
 
+<!-- PENCAPAIAN BULANAN -->
+<div class="section">
+  <div class="sec-title">📈 PENCAPAIAN BULANAN</div>
+  <div id="pencapaianBulanan">
+    <div style="text-align:center;padding:20px;color:#4A5A35;font-size:12px">Memuat...</div>
+  </div>
+</div>
+
 <!-- TARGET BULANAN -->
 <div class="section">
   <div class="sec-title">🎯 TARGET BULAN INI</div>
@@ -516,6 +524,7 @@ window.onload=async()=>{
 async function loadAll(){
   await Promise.all([loadBalance(),loadAnggota(),loadRiwayat(),loadSaldoHarian()]);
   renderKalender();
+  renderPencapaian();
   renderTarget();
 }
 
@@ -576,6 +585,74 @@ function renderKalender(){
 }
 function calPrev(){if(calMonth===0){calMonth=11;calYear--;}else calMonth--;renderKalender();}
 function calNext(){if(calMonth===11){calMonth=0;calYear++;}else calMonth++;renderKalender();}
+
+// ══ PENCAPAIAN BULANAN ══
+function renderPencapaian(){
+  const el = document.getElementById('pencapaianBulanan');
+  if(!el) return;
+  if(!saldoData.length){
+    el.innerHTML='<div style="text-align:center;padding:20px;color:#4A5A35;font-size:12px">Belum ada data</div>';
+    return;
+  }
+
+  const months=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+  // Group saldo per bulan
+  const grouped = {};
+  saldoData.forEach(s => {
+    const d = new Date(s.tanggal);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = months[d.getMonth()] + ' ' + d.getFullYear();
+    if(!grouped[key]) grouped[key] = { label, profit:0, loss:0, days:0, saldoAkhir:0 };
+    grouped[key].profit += parseFloat(s.profit||0) > 0 ? parseFloat(s.profit) : 0;
+    grouped[key].loss   += parseFloat(s.profit||0) < 0 ? parseFloat(s.profit) : 0;
+    grouped[key].days++;
+    grouped[key].saldoAkhir = parseFloat(s.saldo_mt4||0); // ambil yang pertama (terlama)
+  });
+
+  // Sort terbaru dulu
+  const sorted = Object.keys(grouped).sort((a,b) => b.localeCompare(a));
+
+  if(!sorted.length){
+    el.innerHTML='<div style="text-align:center;padding:20px;color:#4A5A35;font-size:12px">Belum ada data bulanan</div>';
+    return;
+  }
+
+  el.innerHTML = sorted.map((key, i) => {
+    const m = grouped[key];
+    const netProfit = m.profit + m.loss; // profit - loss (loss sudah negatif)
+    const isPos = netProfit >= 0;
+    const isLatest = i === 0;
+
+    return `<div style="background:#161A0F;border:1px solid ${isLatest?'#2E4A1E':'#2A2E1F'};border-radius:14px;padding:14px 16px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:14px;font-weight:800;color:#E8E2D5">${m.label}</div>
+          <div style="font-size:10px;color:#4A5A35;margin-top:2px">${m.days} hari trading</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;color:${isPos?'#4ADE80':'#F87171'}">${isPos?'+':''}${fc(netProfit)}</div>
+          <div style="font-size:10px;color:#4A5A35">${isPos?'+':''}${fu(netProfit)} USD nyata</div>
+          <div style="font-size:10px;color:#4A5A35">${isPos?'+':''}${fr(netProfit)}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <div style="background:#0D0F0A;border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:9px;color:#4A5A35;margin-bottom:2px;text-transform:uppercase">Profit</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#4ADE80">+${fc(m.profit)}</div>
+        </div>
+        <div style="background:#0D0F0A;border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:9px;color:#4A5A35;margin-bottom:2px;text-transform:uppercase">Loss</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${m.loss<0?'#F87171':'#4A5A35'}">${fc(m.loss)}</div>
+        </div>
+        <div style="background:#0D0F0A;border-radius:8px;padding:8px;text-align:center">
+          <div style="font-size:9px;color:#4A5A35;margin-bottom:2px;text-transform:uppercase">Saldo Akhir</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#C8A84B">${fc(m.saldoAkhir)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
 
 // ══ TARGET ══
 function renderTarget(){
