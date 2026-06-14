@@ -291,6 +291,24 @@ body{font-family:'Inter',sans-serif;background:#0D0F0A;color:#E8E2D5;min-height:
     <!-- INPUT SALDO -->
     <div style="background:#0D0F0A;border-radius:12px;padding:14px;margin-bottom:12px">
       <div style="font-size:11px;color:#5A6A40;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">📋 Input Saldo MT4 Harian</div>
+
+      <!-- SCAN SCREENSHOT -->
+      <div style="background:#161A0F;border:1.5px dashed #2E4A1E;border-radius:10px;padding:14px;margin-bottom:12px;text-align:center">
+        <div style="font-size:11px;color:#5A6A40;margin-bottom:8px">📸 Upload Screenshot MT4 — AI baca otomatis</div>
+        <input type="file" id="screenshotFile" accept="image/*" style="display:none" onchange="scanScreenshot()">
+        <button class="btn btn-g" style="border-radius:8px;padding:9px 16px;font-size:12px;width:auto;margin-bottom:0" onclick="document.getElementById('screenshotFile').click()">
+          📷 Pilih Screenshot MT4
+        </button>
+        <div id="scanStatus" style="font-size:11px;color:#4A5A35;margin-top:8px;display:none"></div>
+        <div id="scanResult" style="display:none;background:#0D0F0A;border-radius:8px;padding:10px;margin-top:8px;text-align:left">
+          <div style="font-size:10px;color:#4ADE80;font-weight:700;margin-bottom:6px">✅ AI berhasil membaca:</div>
+          <div id="scanResultBody" style="font-size:11px;color:#E8E2D5;line-height:1.6"></div>
+          <button onclick="pakaiHasilScan()" style="margin-top:8px;padding:6px 14px;background:#132D0E;color:#4ADE80;border:1px solid #2E4A1E;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;width:100%">
+            ✓ Pakai Data Ini
+          </button>
+        </div>
+      </div>
+
       <label class="lbl">Saldo MT4 (tulis angka dari MT4)</label>
       <input class="inp" type="number" id="inpSaldo" placeholder="565.48" step="0.01" oninput="previewSaldo()">
       <div class="preview-box" id="pvBox">
@@ -1302,6 +1320,131 @@ async function loadPembagian(){
 
     el.innerHTML = html;
   }catch(e){ console.error(e); }
+}
+
+// ══ SCAN SCREENSHOT MT4 ══
+let scanData = null;
+
+async function scanScreenshot(){
+  const file = document.getElementById('screenshotFile').files[0];
+  if(!file){ toast('❌ Pilih file screenshot'); return; }
+
+  const status = document.getElementById('scanStatus');
+  const result = document.getElementById('scanResult');
+  status.style.display = 'block';
+  result.style.display = 'none';
+  status.textContent = '🤖 AI sedang membaca screenshot...';
+  status.style.color = '#C8A84B';
+
+  try{
+    // Convert image to base64
+    const base64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = () => res(reader.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+
+    // Call Claude API with vision
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: file.type, data: base64 }
+            },
+            {
+              type: 'text',
+              text: `Ini adalah screenshot dari aplikasi MT4 (MetaTrader 4) akun FBS Cent.
+Tolong baca dan ekstrak informasi berikut dalam format JSON:
+{
+  "saldo": (angka Saldo dari MT4, contoh: 565.48),
+  "keuntungan": (angka Keuntungan/profit hari ini, bisa negatif jika loss),
+  "tanggal": (tanggal dari screenshot jika ada, format YYYY-MM-DD, atau null),
+  "keterangan": (ringkasan singkat apa yang kamu lihat)
+}
+Jika tidak bisa menemukan angka tersebut, isi dengan null.
+Balas HANYA dengan JSON, tanpa penjelasan tambahan.`
+            }
+          ]
+        }]
+      })
+    });
+
+    const data = await resp.json();
+    const text = data.content?.[0]?.text || '';
+
+    // Parse JSON from response
+    let parsed = null;
+    try{
+      const clean = text.replace(/```json|```/g,'').trim();
+      parsed = JSON.parse(clean);
+    }catch{
+      throw new Error('AI tidak bisa membaca format screenshot ini');
+    }
+
+    if(!parsed || (parsed.saldo === null && parsed.keuntungan === null)){
+      throw new Error('Tidak ada data yang bisa dibaca dari screenshot ini');
+    }
+
+    scanData = parsed;
+
+    // Tampilkan hasil
+    let resultHtml = '';
+    if(parsed.saldo !== null)
+      resultHtml += `<div>📊 <b>Saldo MT4:</b> <span style="color:#C8A84B;font-family:'JetBrains Mono',monospace">¢${parsed.saldo}</span></div>`;
+    if(parsed.keuntungan !== null){
+      const isPos = parseFloat(parsed.keuntungan) >= 0;
+      resultHtml += `<div>${isPos?'📈':'📉'} <b>${isPos?'Profit':'Loss'}:</b> <span style="color:${isPos?'#4ADE80':'#F87171'};font-family:'JetBrains Mono',monospace">${isPos?'+':''}¢${parsed.keuntungan}</span></div>`;
+    }
+    if(parsed.tanggal)
+      resultHtml += `<div>📅 <b>Tanggal:</b> ${parsed.tanggal}</div>`;
+    if(parsed.keterangan)
+      resultHtml += `<div style="color:#5A6A40;font-size:10px;margin-top:4px">💬 ${parsed.keterangan}</div>`;
+
+    document.getElementById('scanResultBody').innerHTML = resultHtml;
+    result.style.display = 'block';
+    status.textContent = '✅ Screenshot berhasil dibaca!';
+    status.style.color = '#4ADE80';
+
+  }catch(e){
+    status.textContent = '❌ Gagal: ' + e.message;
+    status.style.color = '#F87171';
+    scanData = null;
+  }
+}
+
+function pakaiHasilScan(){
+  if(!scanData){ toast('❌ Tidak ada data scan'); return; }
+
+  if(scanData.saldo !== null){
+    document.getElementById('inpSaldo').value = Math.abs(scanData.saldo);
+    previewSaldo();
+  }
+  if(scanData.keuntungan !== null){
+    const profit = parseFloat(scanData.keuntungan);
+    document.getElementById('inpProfit').value = Math.abs(profit);
+    setPL(profit >= 0 ? 'profit' : 'loss');
+  }
+  if(scanData.tanggal){
+    document.getElementById('inpTgl').value = scanData.tanggal;
+  }
+
+  // Scroll ke form
+  document.getElementById('inpSaldo').scrollIntoView({behavior:'smooth', block:'center'});
+  toast('✅ Data dari screenshot sudah diisi!');
+
+  // Reset scan UI
+  document.getElementById('scanResult').style.display = 'none';
+  document.getElementById('scanStatus').style.display = 'none';
+  document.getElementById('screenshotFile').value = '';
+  scanData = null;
 }
 
 // ══ KURS & PIN ══
