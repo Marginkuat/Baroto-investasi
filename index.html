@@ -43,14 +43,7 @@ body{font-family:'Inter',sans-serif;background:#0D0F0A;color:#E8E2D5;min-height:
 .cg{color:#4ADE80}.cr{color:#F87171}.cy{color:#C8A84B}
 
 /* EA STATUS */
-.ea-status{background:#161A0F;border:1px solid #2A2E1F;border-radius:12px;padding:12px 14px;margin:12px 16px 0;display:flex;align-items:center;justify-content:space-between}
-.ea-left{display:flex;align-items:center;gap:8px}
-.ea-dot{width:7px;height:7px;background:#4ADE80;border-radius:50%;animation:pulse 1.5s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.ea-text .ea-name{font-size:12px;font-weight:700;color:#E8E2D5}
-.ea-text .ea-sub{font-size:10px;color:#4A5A35;margin-top:1px}
-.ea-price{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:#C8A84B;text-align:right}
-.ea-pl{font-size:10px;color:#4ADE80;text-align:right;margin-top:1px}
+
 
 
 
@@ -178,18 +171,25 @@ body{font-family:'Inter',sans-serif;background:#0D0F0A;color:#E8E2D5;min-height:
   </div>
 </div>
 
-<!-- EA STATUS -->
-<div class="ea-status" style="margin:12px 16px 0">
-  <div class="ea-left">
-    <div class="ea-dot"></div>
-    <div class="ea-text">
-      <div class="ea-name">🤖 ARISAN EA — Live Trading</div>
-      <div class="ea-sub">XAUUSD · FBS Cent Account · Auto Running</div>
+<!-- RINGKASAN PROFIT -->
+<div style="background:#161A0F;border:1px solid #2A2E1F;border-radius:14px;margin:12px 16px 0;padding:14px">
+  <div style="font-size:10px;color:#5A6A40;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">📊 Ringkasan Total Profit</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+    <div style="background:#0D0F0A;border-radius:10px;padding:10px 6px;text-align:center">
+      <div style="font-size:9px;color:#4A5A35;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Total Profit</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:#C8A84B" id="rsTotal">¢0</div>
+      <div style="font-size:9px;color:#4A5A35;margin-top:2px" id="rsTotalUSD">$0.00</div>
     </div>
-  </div>
-  <div>
-    <div class="ea-price" id="xauPrice">3,324.80</div>
-    <div class="ea-pl">XAU/USD</div>
+    <div style="background:#0D0F0A;border-radius:10px;padding:10px 6px;text-align:center">
+      <div style="font-size:9px;color:#4A5A35;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Ke Anggota 40%</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:#4ADE80" id="rsAnggota">¢0</div>
+      <div style="font-size:9px;color:#4A5A35;margin-top:2px" id="rsAnggotaUSD">$0.00</div>
+    </div>
+    <div style="background:#0D0F0A;border-radius:10px;padding:10px 6px;text-align:center">
+      <div style="font-size:9px;color:#4A5A35;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Operasional 60%</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:800;color:#C8A84B" id="rsOps">¢0</div>
+      <div style="font-size:9px;color:#4A5A35;margin-top:2px" id="rsOpsUSD">$0.00</div>
+    </div>
   </div>
 </div>
 
@@ -556,7 +556,7 @@ const fr=v=>'Rp '+Math.round(parseFloat(v||0)/100*K).toLocaleString('id-ID');
 const fd=s=>s?new Date(s).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'-';
 
 // ══ STATE ══
-let isAdmin=false,adminData=null,xauPx=3324.80,toastT;
+let isAdmin=false,adminData=null,toastT;
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
 let saldoData=[];
 
@@ -583,19 +583,35 @@ async function loadAll(){
 // ══ BALANCE ══
 async function loadBalance(){
   try{
-    const sh=await api('saldo_harian?select=*&order=tanggal.desc&limit=1');
-    const ns=await api('nasabah?select=*&status=eq.active');
-    const saldo=sh.length?parseFloat(sh[0].saldo_mt4):0;
-    const profit=ns.reduce((s,n)=>s+parseFloat(n.profit_total||0),0);
-    set('balCent',fc(saldo));
-    set('balUSD','= '+fu(saldo)+' USD nyata');
-    set('balRp','≈ '+fr(saldo));
-    set('bAnggota',ns.length);
-    set('bProfit',fc(profit));
-  }catch(e){}
+    const sh = await api('saldo_harian?select=*&order=tanggal.desc&limit=1');
+    const ns = await api('nasabah?select=*&status=eq.active');
+    const allSh = await api('saldo_harian?select=profit&order=tanggal.desc');
+
+    const saldo  = sh.length ? parseFloat(sh[0].saldo_mt4) : 0;
+    const profit = ns.reduce((s,n) => s + parseFloat(n.profit_total||0), 0);
+
+    // Hero balance
+    set('balCent', fc(saldo));
+    set('balUSD',  '= '+fu(saldo)+' USD nyata');
+    set('balRp',   '≈ '+fr(saldo));
+    set('bAnggota', ns.length);
+    set('bProfit',  fc(profit));
+
+    // Ringkasan profit dari saldo harian
+    const totalProfit = allSh.reduce((s,r) => s + Math.max(0, parseFloat(r.profit||0)), 0);
+    const totalLoss   = allSh.reduce((s,r) => s + Math.min(0, parseFloat(r.profit||0)), 0);
+    const net = totalProfit + totalLoss;
+
+    set('rsTotal',      fc(net));
+    set('rsTotalUSD',   fu(net)+' / '+fr(net));
+    set('rsAnggota',    fc(net*0.4));
+    set('rsAnggotaUSD', fu(net*0.4)+' / '+fr(net*0.4));
+    set('rsOps',        fc(net*0.6));
+    set('rsOpsUSD',     fu(net*0.6)+' / '+fr(net*0.6));
+  }catch(e){ console.error(e); }
 }
 
-// ══ SALDO HARIAN ══
+
 async function loadSaldoHarian(){
   try{
     saldoData=await api('saldo_harian?select=*&order=tanggal.desc&limit=60');
@@ -1356,13 +1372,7 @@ function toast(msg){
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3000);
 }
 
-// ══ XAU/USD LIVE ══
-setInterval(()=>{
-  xauPx+=(Math.random()-.49)*1.5;
-  xauPx=Math.max(3280,Math.min(3380,xauPx));
-  const el=document.getElementById('xauPrice');
-  if(el)el.textContent=xauPx.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');
-},1200);
+
 </script>
 </body>
 </html>
