@@ -233,6 +233,56 @@ body{font-family:'Inter',sans-serif;background:#0D0F0A;color:#E8E2D5;min-height:
   </div>
 </div>
 
+<!-- PROFIT TERKUMPUL & PEMBAGIAN -->
+<div class="section">
+  <div class="sec-title">💰 PROFIT TERKUMPUL</div>
+  <div style="background:#161A0F;border:1px solid #2A2E1F;border-radius:16px;padding:16px;margin-bottom:8px">
+
+    <!-- Total Profit Terkumpul -->
+    <div style="text-align:center;margin-bottom:14px">
+      <div style="font-size:10px;color:#5A6A40;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Profit Belum Dibagikan</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:800;color:#4ADE80" id="profitTerkumpul">¢0.00</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:#5A6A40;margin-top:4px" id="profitTerkumpulUSD">= $0.00 USD nyata</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#3A4A2A;margin-top:2px" id="profitTerkumpulRp">≈ Rp 0</div>
+    </div>
+
+    <!-- Simulasi Pembagian -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div style="background:#0D0F0A;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:9px;color:#4A5A35;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Ke Anggota (40%)</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:800;color:#4ADE80" id="ptAnggota">¢0.00</div>
+        <div style="font-size:10px;color:#3A4A2A;margin-top:2px" id="ptAnggotaUSD">$0.00</div>
+        <div style="font-size:10px;color:#3A4A2A" id="ptAnggotaRp">Rp 0</div>
+      </div>
+      <div style="background:#0D0F0A;border-radius:10px;padding:12px;text-align:center">
+        <div style="font-size:9px;color:#4A5A35;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Operasional (60%)</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:800;color:#C8A84B" id="ptOps">¢0.00</div>
+        <div style="font-size:10px;color:#3A4A2A;margin-top:2px" id="ptOpsUSD">$0.00</div>
+        <div style="font-size:10px;color:#3A4A2A" id="ptOpsRp">Rp 0</div>
+      </div>
+    </div>
+
+    <!-- Warning rapat -->
+    <div style="background:#1A1200;border:1px solid #3A2E00;border-radius:10px;padding:10px 12px;text-align:center">
+      <div style="font-size:12px;font-weight:700;color:#C8A84B;margin-bottom:3px">⚠️ Pembagian Profit</div>
+      <div style="font-size:11px;color:#5A4A20;line-height:1.5">Pembagian hanya dilakukan setelah <b style="color:#C8A84B">rapat internal anggota</b>.<br>Admin akan mencatat hasil rapat di bawah.</div>
+    </div>
+
+    <!-- Tombol catat — hanya admin -->
+    <div id="btnCatatPembagianWrap" style="display:none;margin-top:10px">
+      <button class="btn btn-p" onclick="openModal('mTambahPembagian')" style="border-radius:9px">📋 Catat Hasil Rapat & Bagikan</button>
+    </div>
+  </div>
+</div>
+
+<!-- RIWAYAT PEMBAGIAN -->
+<div class="section">
+  <div class="sec-title">📋 RIWAYAT PEMBAGIAN</div>
+  <div id="pembagianList">
+    <div style="text-align:center;padding:20px;color:#4A5A35;font-size:12px">Memuat...</div>
+  </div>
+</div>
+
 <!-- PENCAPAIAN BULANAN -->
 <div class="section">
   <div class="sec-title">📈 PENCAPAIAN BULANAN</div>
@@ -266,17 +316,7 @@ body{font-family:'Inter',sans-serif;background:#0D0F0A;color:#E8E2D5;min-height:
   </div>
 </div>
 
-<!-- PEMBAGIAN HASIL -->
-<div class="section">
-  <div class="sec-title">💰 PEMBAGIAN HASIL</div>
-  <div id="pembagianList">
-    <div style="text-align:center;padding:20px;color:#4A5A35;font-size:12px">Memuat...</div>
-  </div>
-  <!-- Tombol tambah hanya admin -->
-  <div id="btnTambahPembagianWrap" style="display:none;margin-top:8px">
-    <button class="btn btn-p" onclick="openModal('mTambahPembagian')" style="border-radius:9px">+ Catat Pembagian Hasil</button>
-  </div>
-</div>
+
 
 <!-- RIWAYAT -->
 <div class="section">
@@ -605,6 +645,7 @@ async function loadBalance(){
     const sh = await api('saldo_harian?select=*&order=tanggal.desc&limit=1');
     const ns = await api('nasabah?select=*&status=eq.active');
     const allSh = await api('saldo_harian?select=profit&order=tanggal.desc');
+    const pb = await api('profit_ea?select=total_profit');
 
     const saldo  = sh.length ? parseFloat(sh[0].saldo_mt4) : 0;
     const profit = ns.reduce((s,n) => s + parseFloat(n.profit_total||0), 0);
@@ -627,6 +668,19 @@ async function loadBalance(){
     set('rsAnggotaUSD', fu(net*0.4)+' / '+fr(net*0.4));
     set('rsOps',        fc(net*0.6));
     set('rsOpsUSD',     fu(net*0.6)+' / '+fr(net*0.6));
+
+    // Profit terkumpul = total profit harian - yang sudah dibagikan
+    const sudahDibagi = pb.reduce((s,r) => s + parseFloat(r.total_profit||0), 0);
+    const terkumpul = Math.max(0, net - sudahDibagi);
+    set('profitTerkumpul',    fc(terkumpul));
+    set('profitTerkumpulUSD','= '+fu(terkumpul)+' USD nyata');
+    set('profitTerkumpulRp', '≈ '+fr(terkumpul));
+    set('ptAnggota',    fc(terkumpul*0.4));
+    set('ptAnggotaUSD', fu(terkumpul*0.4));
+    set('ptAnggotaRp',  fr(terkumpul*0.4));
+    set('ptOps',    fc(terkumpul*0.6));
+    set('ptOpsUSD', fu(terkumpul*0.6));
+    set('ptOpsRp',  fr(terkumpul*0.6));
   }catch(e){ console.error(e); }
 }
 
@@ -1478,7 +1532,7 @@ async function login(){
     isAdmin=true;adminData=rows[0];
     closeModal('mLogin');
     hide('btnAdmin');show('btnLogout');
-    show('adminPanel');show('btnTambahWrap');show('btnTambahPembagianWrap');
+    show('adminPanel');show('btnTambahWrap');show('btnTambahPembagianWrap');show('btnCatatPembagianWrap');
     toast('👑 Selamat datang Admin!');
     await loadSaldoHarian();
     renderRiwayatSaldo();
