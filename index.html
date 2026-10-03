@@ -5138,14 +5138,10 @@ function renderRekapPair(){
     sel.innerHTML=daftarBulan.map(k=>`<option value="${k}">${labelBulan(k)}${k===bulanIni?' (bulan ini)':''}</option>`).join('')+'<option value="ALL">Semua bulan</option>';
     sel.value=rekapPairBulanDipilih;
   }
-  const closedBulan=rekapPairBulanDipilih==='ALL'?semuaClosed:semuaClosed.filter(r=>bulanKeyOf(r.tanggal)===rekapPairBulanDipilih);
-  // Rekap ini KHUSUS FOREX — emas/crypto (XAUUSD, XAGUSD, BTC, ETH, ...USDT) tidak ikut dihitung.
-  const bukanForex=r=>/^(XAU|XAG|BTC|ETH)|USDT$/i.test(String(r.simbol||g));
-  const closedList=closedBulan.filter(r=>!bukanForex(r));
-  const jumlahNonForex=closedBulan.length-closedList.length;
-  const catatanNonForex=jumlahNonForex?`<div style="font-size:8px;color:#7A5D1F;margin-top:8px;text-align:center">ℹ️ ${jumlahNonForex} sinyal non-forex (XAUUSD/crypto) tidak ikut direkap.</div>`:'';
+  const closedList=rekapPairBulanDipilih==='ALL'?semuaClosed:semuaClosed.filter(r=>bulanKeyOf(r.tanggal)===rekapPairBulanDipilih);
+  const catatanNonForex='';
   if(!closedList.length){
-    wrap.innerHTML=`<div style="font-size:9px;color:#8A6B26;text-align:center;padding:6px">Belum ada sinyal forex closed di ${labelBulan(rekapPairBulanDipilih)}.</div>`+catatanNonForex;
+    wrap.innerHTML=`<div style="font-size:9px;color:#8A6B26;text-align:center;padding:6px">Belum ada sinyal closed di ${labelBulan(rekapPairBulanDipilih)}.</div>`;
     return;
   }
   const grup={};
@@ -5193,7 +5189,7 @@ function renderRingkasanBatch(){
   if(!wrap)return;
   const g=daftarSinyalPairGroup||'XAUUSD';
   if(typeof renderRekapPair==='function') renderRekapPair(); // pastikan bulan terpilih sudah ke-set
-  const closedAll=(cachedSinyalAnalis[g]||[]).filter(r=>r.status!=='running' && !/^(XAU|XAG|BTC|ETH)|USDT$/i.test(String(r.simbol||g)));
+  const closedAll=(cachedSinyalAnalis[g]||[]).filter(r=>r.status!=='running');
   const closedList=(!rekapPairBulanDipilih||rekapPairBulanDipilih==='ALL')?closedAll:closedAll.filter(r=>bulanKeyOf(r.tanggal)===rekapPairBulanDipilih);
   if(!closedList.length){
     wrap.innerHTML=`<div style="font-size:9px;color:#8A6B26;text-align:center;padding:6px">Belum ada sinyal closed di bulan ini.</div>`;
