@@ -1690,6 +1690,7 @@ function renderInvCalcDisclaimer(){
     <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
       <div style="font-size:10px;color:#8A6B26;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">💱 Rekap per Pair / Mata Uang (channel ini)</div>
       <div style="font-size:9px;color:#5C4818;margin-bottom:10px;line-height:1.5">Sinyal closed dikelompokkan per pair — langsung kelihatan pair mana yang PROFIT dan mana yang LOSS.</div>
+      <select class="inp" id="rekapPairBulan" onchange="rekapPairBulanDipilih=this.value;renderRekapPair()" style="margin-bottom:10px"></select>
       <div id="rekapPairWrap"></div>
     </div>
 
@@ -5118,13 +5119,28 @@ async function tutupSinyalRunning(g, id, jenis){
 // ── Ringkasan Net VP per Batch — kelompokkan sinyal CLOSED (bukan yang masih running)
 // berdasarkan label batch, biar kelihatan mana batch yang net-nya nambah buffer VP dan mana
 // yang justru gerus. Sinyal tanpa batch label dikumpulkan jadi satu grup "(tanpa batch)". ──
+let rekapPairBulanDipilih=null;
 function renderRekapPair(){
   const wrap=document.getElementById('rekapPairWrap');
   if(!wrap)return;
   const g=daftarSinyalPairGroup||'XAUUSD';
-  const closedList=(cachedSinyalAnalis[g]||[]).filter(r=>r.status!=='running');
+  const semuaClosed=(cachedSinyalAnalis[g]||[]).filter(r=>r.status!=='running');
+  const nm=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const labelBulan=k=>k==='ALL'?'Semua bulan':nm[parseInt(k.slice(5),10)-1]+' '+k.slice(0,4);
+  const now=new Date();
+  const bulanIni=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const setBulan=new Set([bulanIni]);
+  semuaClosed.forEach(r=>setBulan.add(bulanKeyOf(r.tanggal)));
+  const daftarBulan=[...setBulan].sort().reverse();
+  if(!rekapPairBulanDipilih || (rekapPairBulanDipilih!=='ALL' && !setBulan.has(rekapPairBulanDipilih))) rekapPairBulanDipilih=bulanIni;
+  const sel=document.getElementById('rekapPairBulan');
+  if(sel){
+    sel.innerHTML=daftarBulan.map(k=>`<option value="${k}">${labelBulan(k)}${k===bulanIni?' (bulan ini)':''}</option>`).join('')+'<option value="ALL">Semua bulan</option>';
+    sel.value=rekapPairBulanDipilih;
+  }
+  const closedList=rekapPairBulanDipilih==='ALL'?semuaClosed:semuaClosed.filter(r=>bulanKeyOf(r.tanggal)===rekapPairBulanDipilih);
   if(!closedList.length){
-    wrap.innerHTML=`<div style="font-size:9px;color:#8A6B26;text-align:center;padding:6px">Belum ada sinyal closed buat direkap.</div>`;
+    wrap.innerHTML=`<div style="font-size:9px;color:#8A6B26;text-align:center;padding:6px">Belum ada sinyal closed di ${labelBulan(rekapPairBulanDipilih)}.</div>`;
     return;
   }
   const grup={};
