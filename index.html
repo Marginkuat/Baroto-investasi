@@ -1695,7 +1695,7 @@ function renderInvCalcDisclaimer(){
     </div>
 
     <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
-      <div style="font-size:10px;color:#8A6B26;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">📦 Ringkasan Net VP per Batch (channel ini)</div>
+      <div style="font-size:10px;color:#8A6B26;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">📦 Ringkasan Net VP per Batch (channel ini — ikut bulan terpilih di atas)</div>
       <div id="ringkasanBatchWrap"></div>
     </div>
 
@@ -5187,10 +5187,11 @@ function renderRingkasanBatch(){
   const wrap=document.getElementById('ringkasanBatchWrap');
   if(!wrap)return;
   const g=daftarSinyalPairGroup||'XAUUSD';
-  const closedList=(cachedSinyalAnalis[g]||[]).filter(r=>r.status!=='running');
+  if(typeof renderRekapPair==='function') renderRekapPair(); // pastikan bulan terpilih sudah ke-set
+  const closedAll=(cachedSinyalAnalis[g]||[]).filter(r=>r.status!=='running');
+  const closedList=(!rekapPairBulanDipilih||rekapPairBulanDipilih==='ALL')?closedAll:closedAll.filter(r=>bulanKeyOf(r.tanggal)===rekapPairBulanDipilih);
   if(!closedList.length){
-    wrap.innerHTML=`<div style="font-size:9px;color:#8A6B26;text-align:center;padding:6px">Belum ada sinyal closed buat diringkas.</div>`;
-    renderRekapPair();
+    wrap.innerHTML=`<div style="font-size:9px;color:#8A6B26;text-align:center;padding:6px">Belum ada sinyal closed di bulan ini.</div>`;
     renderKalkulatorRemSinyal(g);
     return;
   }
@@ -5215,7 +5216,6 @@ function renderRingkasanBatch(){
       <div style="font-size:13px;font-weight:800;color:${warna};margin-top:2px">${d.vp>=0?'+':''}${d.vp.toFixed(2)} VP <span style="font-size:9px;font-weight:400;color:#8A6B26">(${d.pips>=0?'+':''}${d.pips.toFixed(1)} pip)</span></div>
     </div>`;
   }).join('');
-  renderRekapPair();
   renderKalkulatorRemSinyal(g);
 }
 // ── Kalkulator Rem Sinyal Analis — gaya kayak "Level Kalkulator Umum": nunjukin capaian
