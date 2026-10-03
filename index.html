@@ -4622,6 +4622,14 @@ async function simpanDataHarianRingkas(){
 }
 // ── Edit & Hapus sinyal — jaga-jaga kalau salah input ──
 let daftarSinyalExpanded=false;
+let daftarSinyalBulanBuka={};
+function toggleBulanRiwayat(k){
+  const sekarang=new Date();
+  const kini=sekarang.getFullYear()+'-'+String(sekarang.getMonth()+1).padStart(2,'0');
+  const terbuka=(k in daftarSinyalBulanBuka)?daftarSinyalBulanBuka[k]:(k===kini);
+  daftarSinyalBulanBuka[k]=!terbuka;
+  renderDaftarSinyal();
+}
 async function hapusSinyal(g, id){
   if(!isAdmin){toast('❌ Harus masuk sebagai Admin');return;}
   const item=(cachedSinyalAnalis[g]||[]).find(r=>r.id===id);
@@ -4689,9 +4697,7 @@ function renderDaftarSinyal(){
   }
   const jumlahTercocok=list.filter(r=>r.cocok).length;
   const ringkasanCocokHtml=`<div style="font-size:9px;color:#8A6B26;text-align:right;margin-bottom:4px">✅ Dicocokkan: ${jumlahTercocok}/${list.length}</div>`;
-  const BATAS_TAMPIL=4;
-  const tampil = daftarSinyalExpanded ? list : list.slice(0,BATAS_TAMPIL);
-  const baris = tampil.map(r=>{
+  const barisHtml=r=>{
     const warnaPip = r.pips>=0 ? '#3E9142' : '#D9534F';
     const cocok=!!r.cocok;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);${cocok?'opacity:0.55':''}">
@@ -4707,12 +4713,31 @@ function renderDaftarSinyal(){
         <span onclick="hapusSinyal('${g}','${r.id}')" style="font-size:14px;cursor:pointer">🗑️</span>
       </div>
     </div>`;
+  };
+  // ── Dikelompokkan PER BULAN. Bulan berjalan terbuka otomatis; bulan lama dilipat (tap untuk buka).
+  // Data tetap tersimpan utuh — ini cuma cara tampilnya. ──
+  const nmBln=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const nowD=new Date();
+  const bulanSekarang=nowD.getFullYear()+'-'+String(nowD.getMonth()+1).padStart(2,'0');
+  const perBulan={};
+  list.forEach(r=>{ const k=bulanKeyOf(r.tanggal); (perBulan[k]=perBulan[k]||[]).push(r); });
+  const urutBulan=Object.keys(perBulan).sort().reverse();
+  const baris=urutBulan.map(k=>{
+    const arr=perBulan[k];
+    const totVp=arr.reduce((t,r)=>t+parseFloat(r.vp||0),0);
+    const totPip=arr.reduce((t,r)=>t+parseFloat(r.pips||0),0);
+    const buka = (k in daftarSinyalBulanBuka) ? daftarSinyalBulanBuka[k] : (k===bulanSekarang);
+    const warna=totVp>=0?'#3E9142':'#D9534F';
+    const label=nmBln[parseInt(k.slice(5),10)-1]+' '+k.slice(0,4)+(k===bulanSekarang?' (bulan ini)':'');
+    return `<div style="margin-bottom:10px">
+      <div onclick="toggleBulanRiwayat('${k}')" style="display:flex;justify-content:space-between;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;cursor:pointer">
+        <div style="font-size:11px;font-weight:800;color:#C8A84B">${buka?'▼':'▶'} 📅 ${label}</div>
+        <div style="text-align:right"><div style="font-size:10px;font-weight:800;color:${warna}">${totVp>=0?'+':''}${totVp.toFixed(2)} VP</div><div style="font-size:8px;color:#8A6B26">${arr.length} sinyal · ${totPip>=0?'+':''}${totPip.toFixed(1)} pip</div></div>
+      </div>
+      ${buka?arr.map(barisHtml).join(''):''}
+    </div>`;
   }).join('');
-  const sisaJumlah=list.length-BATAS_TAMPIL;
-  const tombolToggle = list.length>BATAS_TAMPIL
-    ? `<div onclick="toggleDaftarSinyal()" style="text-align:center;font-size:9px;color:#C8A84B;cursor:pointer;text-decoration:underline;padding-top:8px">${daftarSinyalExpanded?'Sembunyikan':'Tampilkan '+sisaJumlah+' lainnya'}</div>`
-    : '';
-  wrap.innerHTML=ringkasanCocokHtml+baris+tombolToggle;
+  wrap.innerHTML=ringkasanCocokHtml+baris;
   renderDaftarRunning();
   renderRingkasanBatch();
 }
